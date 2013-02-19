@@ -14,6 +14,7 @@ import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.IterativeRobot;
 import edu.wpi.first.wpilibj.Jaguar;
 import edu.wpi.first.wpilibj.Joystick;
+import edu.wpi.first.wpilibj.Timer;
 
 /**
  * The VM is configured to automatically run this class, and to call the
@@ -25,6 +26,8 @@ import edu.wpi.first.wpilibj.Joystick;
 public class RobotTemplate extends IterativeRobot {
     
     Dashboard dash = DriverStation.getInstance().getDashboardPackerHigh();
+    
+    int diskCount = 2;
     
     Jaguar leftJag = new Jaguar(1);
     Jaguar rightJag = new Jaguar(2);
@@ -38,25 +41,59 @@ public class RobotTemplate extends IterativeRobot {
     Joystick leftStick = new Joystick(1);
     Joystick rightStick = new Joystick(2);
     
+    Timer time = new Timer();
+    Timer autoTimer = new Timer();
+    
     int feederState = 1;
     int feederHopperState = 1;
+    int autoState = 0;
     
     public void robotInit() {
         reset();
+    }
+    
+    public void autonomousInit() {
+        autoTimer.start();
     }
 
     /**
      * This function is called periodically during autonomous
      */
     public void autonomousPeriodic() {
-
+        shooter.set(1);
+        if(feederState == 1 && autoTimer.get() > 2 && !feederSwitch.get()) {
+            feederState = 2;
+        } else if (feederState == 2 && feederSwitch.get()){
+            feederState = 3;
+        } else if(feederState == 3 && !feederSwitch.get()) {
+            feederState = 0;
+            autoTimer.reset();
+        } else if (feederState ==0 && !rightStick.getRawButton(1)) {
+            feederState = 1;
+        }
+        
+        if(feederState > 1) {
+            feeder.set(1);
+        } else {
+            feeder.set(0);
+        }
+        
+        if(feederHopperState == 1 && rightStick.getRawButton(3) && !feederHopperSwitch.get()) {
+            feederHopperState = 2;
+        } else if (feederHopperState == 2 && feederHopperSwitch.get()){
+            feederHopperState = 3;
+        } else if(feederHopperState == 3 && !feederHopperSwitch.get()) {
+            feederHopperState = 0;
+        } else if (feederHopperState ==0 && !rightStick.getRawButton(3)) {
+            feederHopperState = 1;
+        }
     }
 
     /**
      * This function is called periodically during operator control
      */
     public void teleopPeriodic() {
-        leftJag.set(leftStick.getAxis(Joystick.AxisType.kY));
+        leftJag.set(leftStick.getAxis(Joystick.AxisType.kY)/2);
         rightJag.set(rightStick.getAxis(Joystick.AxisType.kY));
         
         if(leftStick.getRawButton(1)) {
@@ -87,11 +124,20 @@ public class RobotTemplate extends IterativeRobot {
             feederHopperState = 3;
         } else if(feederHopperState == 3 && !feederHopperSwitch.get()) {
             feederHopperState = 0;
+            if (rightStick.getRawButton(3)) {
+                time.start();
+            }
         } else if (feederHopperState ==0 && !rightStick.getRawButton(3)) {
             feederHopperState = 1;
         }
         
-        if(feederHopperState >1) {
+        if (time.get() > 0.4) {
+            time.stop();
+            time.reset();
+            feederState = 2;
+        }
+        
+        if(feederHopperState > 1) {
             feederHopper.set(1);
         } else {
             feederHopper.set(0);
@@ -106,10 +152,9 @@ public class RobotTemplate extends IterativeRobot {
      * This function is called periodically during test mode
      */
     public void testPeriodic() {
-        System.out.println(dash.addString("robot TESTED"));
     }
     
-    public void reset() {
+    private void reset() {
         while(feederSwitch.get()) {
                 feeder.set(1);
         }
